@@ -1,0 +1,432 @@
+/* --- Designs ------------------------------------------------------------------------
+   Jedes Design setzt nur Farben, Schrift und Oberflächen; das Layout ist für alle gleich. */
+
+/* Klassisch: blaue Kunststoffschale, cremeweiße Würfel */
+:root,
+[data-theme="classic"] {
+  --bg: #13202d;
+  --text: #f4efe4;
+  --muted: #9fb0c2;
+  --surface: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.14);
+  --tray-bg: linear-gradient(160deg, #1d4f8c 0%, #123764 100%);
+  --tray-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -4px 10px rgba(0, 0, 0, 0.35),
+    0 10px 24px rgba(0, 0, 0, 0.45);
+  --die-bg: linear-gradient(150deg, #ffffff 0%, #ece7dc 45%, #c7bfae 100%);
+  --die-shadow: 0 4px 6px rgba(0, 0, 0, 0.45), inset 0 -2px 3px rgba(0, 0, 0, 0.18);
+  --face-bg: radial-gradient(circle at 35% 30%, #fffefb 0%, #f7f3ea 70%);
+  --ink: #16202b;
+  --letter-font: Futura, "Century Gothic", "Avenir Next", "Arial Black", system-ui, sans-serif;
+  --letter-weight: 800;
+  --letter-glow: none;
+  --accent: #f2b33d;
+  --accent-ink: #16202b;
+  --warn: #e5533d;
+  --highlight: #ffd34d;
+  --highlight-ink: #16202b;
+}
+
+/* Holz: Holzbrett mit Maserung, elfenbeinfarbene Würfel, Serifenschrift */
+[data-theme="wood"] {
+  --bg: #241811;
+  --text: #f3e6d3;
+  --muted: #c4a98a;
+  --surface: rgba(255, 236, 210, 0.07);
+  --border: rgba(255, 236, 210, 0.16);
+  --tray-bg:
+    repeating-linear-gradient(97deg, rgba(0, 0, 0, 0.07) 0 2px, transparent 2px 11px),
+    repeating-linear-gradient(83deg, rgba(255, 220, 170, 0.06) 0 1px, transparent 1px 17px),
+    linear-gradient(160deg, #9c6a3c 0%, #74471f 55%, #57331a 100%);
+  --tray-shadow:
+    inset 0 2px 0 rgba(255, 220, 170, 0.25),
+    inset 0 -5px 12px rgba(0, 0, 0, 0.4),
+    0 10px 24px rgba(0, 0, 0, 0.55);
+  --die-bg: linear-gradient(150deg, #fffaf0 0%, #efe3cc 45%, #c9b28a 100%);
+  --die-shadow: 0 4px 6px rgba(40, 20, 5, 0.55), inset 0 -2px 3px rgba(80, 50, 20, 0.2);
+  --face-bg: radial-gradient(circle at 35% 30%, #fffaf0 0%, #f4e8d2 70%);
+  --ink: #3b2412;
+  --letter-font: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  --letter-weight: 700;
+  --letter-glow: none;
+  --accent: #d98c3f;
+  --accent-ink: #241811;
+  --warn: #e0623f;
+  --highlight: #f2c14e;
+  --highlight-ink: #3b2412;
+}
+
+/* Neon: dunkle Würfel mit leuchtenden Buchstaben */
+[data-theme="neon"] {
+  --bg: #0a0a14;
+  --text: #e8e8ff;
+  --muted: #8a8ab0;
+  --surface: rgba(140, 140, 255, 0.07);
+  --border: rgba(140, 140, 255, 0.2);
+  --tray-bg: linear-gradient(160deg, #181834 0%, #0d0d1e 100%);
+  --tray-shadow:
+    0 0 0 2px rgba(255, 79, 216, 0.55),
+    0 0 26px rgba(255, 79, 216, 0.35),
+    inset 0 0 18px rgba(94, 242, 255, 0.08);
+  --die-bg: linear-gradient(150deg, #34345a 0%, #22223e 50%, #141428 100%);
+  --die-shadow: 0 4px 8px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(94, 242, 255, 0.18);
+  --face-bg: radial-gradient(circle at 35% 30%, #262648 0%, #1a1a32 70%);
+  --ink: #5ef2ff;
+  --letter-font: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
+  --letter-weight: 700;
+  --letter-glow: 0 0 6px rgba(94, 242, 255, 0.8), 0 0 14px rgba(94, 242, 255, 0.45);
+  --accent: #ff4fd8;
+  --accent-ink: #0a0a14;
+  --warn: #ff5f6d;
+  --highlight: #ff4fd8;
+  --highlight-ink: #0a0a14;
+}
+
+/* --- Grundlayout ------------------------------------------------------------------ */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+}
+
+.menu,
+.game {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3.5vh;
+}
+.menu { gap: 5vh; }
+
+/* --- Startbildschirm ------------------------------------------------------------- */
+
+/* Logo aus sieben Würfeln ("RASCHEL"), zeigt gleichzeitig das gewählte Design */
+.logo {
+  --n: 7;
+  --size: min(92vw, 420px);
+  width: var(--size);
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: calc(var(--size) * 0.025);
+  font-size: inherit;
+}
+.logo .die { aspect-ratio: 1; }
+
+.topbar {
+  width: min(92vw, 60vh, 520px);
+  display: flex;
+  margin-bottom: -2vh;
+}
+.link-btn {
+  padding: 0.4em 0.2em;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.timer {
+  font-size: clamp(3rem, 16vw, 5.5rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.timer.low { color: var(--accent); }
+.timer.over { color: var(--warn); }
+
+/* --- Spielfeld (4x4, 5x5 oder 6x6 über --n) ---------------------------------------- */
+
+.board {
+  --n: 4;
+  --size: min(92vw, 60vh, 520px);
+  width: var(--size);
+  height: var(--size);
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--n), 1fr);
+  gap: calc(var(--size) * 0.1 / var(--n));
+  padding: calc(var(--size) * 0.04);
+  background: var(--tray-bg);
+  border-radius: calc(var(--size) * 0.06);
+  box-shadow: var(--tray-shadow);
+}
+
+/* Würfel: abgeschrägte Kanten außen, leicht gewölbte Oberseite innen */
+.die {
+  position: relative;
+  display: flex;
+  padding: 9%;
+  border-radius: 17%;
+  background: var(--die-bg);
+  box-shadow: var(--die-shadow);
+}
+
+.face {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 13%;
+  background: var(--face-bg);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  color: var(--ink);
+  font-family: var(--letter-font);
+  font-size: calc(var(--size) * 0.46 / var(--n));
+  font-weight: var(--letter-weight);
+  line-height: 1;
+  text-shadow: var(--letter-glow);
+  transition: background-color 0.15s;
+}
+.face.qu { font-size: calc(var(--size) * 0.36 / var(--n)); }
+
+.board.shaking .die { animation: wobble 0.14s ease-in-out infinite alternate; }
+.board.shaking .die:nth-child(odd) { animation-delay: -0.07s; }
+
+@keyframes wobble {
+  from { transform: translate(-1px, 1px) rotate(-3deg); }
+  to   { transform: translate(1px, -1px) rotate(3deg); }
+}
+
+/* Hervorgehobener Wortpfad */
+.die.hl .face {
+  background: var(--highlight);
+  color: var(--highlight-ink);
+  text-shadow: none;
+}
+.die .step {
+  position: absolute;
+  top: 4%;
+  left: 6%;
+  font-size: max(9px, calc(var(--size) * 0.13 / var(--n)));
+  font-weight: 700;
+  color: var(--highlight-ink);
+  opacity: 0.75;
+}
+
+/* --- Ergebnisse ---------------------------------------------------------------- */
+
+.results {
+  width: min(92vw, 520px);
+}
+.results h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+}
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin-bottom: 0.6rem;
+}
+.hint:empty { display: none; }
+
+.word-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.word-list button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0.55em 0.7em;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+}
+.word-list button.active {
+  background: var(--highlight);
+  border-color: var(--highlight);
+  color: var(--highlight-ink);
+}
+.word-list .word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.word-list .len {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
+.definition {
+  margin-top: 10px;
+  padding: 0.8em 0.9em;
+  border-left: 4px solid var(--highlight);
+  border-radius: 10px;
+  background: var(--surface);
+  user-select: text;
+  -webkit-user-select: text;
+}
+.def-word {
+  font-weight: 700;
+  margin-bottom: 0.25em;
+}
+.def-text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+.def-example {
+  margin-top: 0.5em;
+  padding-top: 0.5em;
+  border-top: 1px solid var(--border);
+  font-size: 0.9rem;
+  font-style: italic;
+  line-height: 1.4;
+}
+.def-example::before {
+  content: "Beispiel: ";
+  font-style: normal;
+  font-weight: 600;
+  color: var(--muted);
+}
+.def-example.missing { color: var(--muted); }
+.def-example.missing::before { content: ""; }
+.def-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 0.6em;
+}
+.def-link {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* --- Einstellungen ------------------------------------------------------------------ */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  color: var(--muted);
+}
+.setting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.setting-label {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.duration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.duration input {
+  width: 3.4em;
+  padding: 0.4em 0.2em;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.1rem; /* mind. 16px, sonst zoomt iOS beim Antippen */
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.duration input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.segmented button {
+  padding: 0.55em 1em;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+/* --- Buttons --------------------------------------------------------------------- */
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+.btn {
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 700;
+  padding: 0.85em 1.8em;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn.secondary {
+  background: transparent;
+  color: var(--text);
+  box-shadow: inset 0 0 0 2px var(--border);
+}
+.btn:active { transform: scale(0.97); }
+.btn:disabled { opacity: 0.6; }
+
+/* Versionsnummer unten rechts */
+.version {
+  position: fixed;
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(6px, env(safe-area-inset-bottom));
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+[hidden] { display: none !important; }

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de" data-theme="classic">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#13202d">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Raschel">
+  <title>Raschel</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app">
+    <!-- Startbildschirm: Einstellungen vor Spielbeginn -->
+    <section class="menu" id="menu">
+      <h1 class="logo" aria-label="Raschel">
+        <span class="die"><span class="face">R</span></span>
+        <span class="die"><span class="face">A</span></span>
+        <span class="die"><span class="face">S</span></span>
+        <span class="die"><span class="face">C</span></span>
+        <span class="die"><span class="face">H</span></span>
+        <span class="die"><span class="face">E</span></span>
+        <span class="die"><span class="face">L</span></span>
+      </h1>
+      <div class="settings">
+        <div class="setting">
+          <span class="setting-label">Feldgröße</span>
+          <div class="segmented" id="size-options" role="group" aria-label="Feldgröße">
+            <button type="button" data-value="4">4×4</button>
+            <button type="button" data-value="5">5×5</button>
+            <button type="button" data-value="6">6×6</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="setting-label">Design</span>
+          <div class="segmented" id="theme-options" role="group" aria-label="Design">
+            <button type="button" data-value="classic">Klassisch</button>
+            <button type="button" data-value="wood">Holz</button>
+            <button type="button" data-value="neon">Neon</button>
+          </div>
+        </div>
+        <div class="setting">
+          <span class="setting-label">Rundenzeit</span>
+          <div class="duration">
+            <input id="minutes" type="number" inputmode="numeric" min="0" max="59" value="2" aria-label="Minuten">
+            <span>min</span>
+            <input id="seconds" type="number" inputmode="numeric" min="0" max="59" step="5" value="0" aria-label="Sekunden">
+            <span>s</span>
+          </div>
+        </div>
+      </div>
+      <button class="btn" id="play">Spiel starten</button>
+    </section>
+
+    <!-- Spiel -->
+    <section class="game" id="game" hidden>
+      <div class="topbar">
+        <button type="button" class="link-btn" id="menu-btn">‹ Menü</button>
+      </div>
+      <div class="timer" id="timer">2:00</div>
+      <div class="board" id="board"></div>
+      <section class="results" id="results" hidden>
+        <h2>Die längsten Wörter</h2>
+        <p class="hint" id="results-status"></p>
+        <ol class="word-list" id="word-list"></ol>
+        <div class="definition" id="definition" hidden>
+          <p class="def-word" id="def-word"></p>
+          <p class="def-text" id="def-text"></p>
+          <p class="def-example" id="def-example" hidden></p>
+          <div class="def-links" id="def-links" hidden>
+            <a class="def-link" id="def-link" target="_blank" rel="noopener">Mehr bei Wiktionary</a>
+            <a class="def-link" id="def-duden" target="_blank" rel="noopener">Im Duden nachschlagen</a>
+          </div>
+        </div>
+      </section>
+      <div class="controls">
+        <button class="btn secondary" id="show-words" hidden>Längste Wörter</button>
+        <button class="btn" id="start">Neue Runde</button>
+      </div>
+    </section>
+  </main>
+  <div class="version" id="version"></div>
+  <script src="version.js"></script>
+  <script src="data/bigrams.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
