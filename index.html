@@ -55,13 +55,26 @@
         </div>
       </div>
       <button class="btn" id="play">Spiel starten</button>
+      <button type="button" class="link-btn" id="menu-invite">Zuschauer einladen</button>
+    </section>
+
+    <!-- Beitritt als Zuschauer über einen Einladungslink (?watch=…) -->
+    <section class="join" id="join" hidden>
+      <p class="join-title">Raschel</p>
+      <p class="join-text">Du wurdest eingeladen, einer Runde live zuzuschauen.</p>
+      <button class="btn" id="join-btn">Zuschauen</button>
+      <p class="hint" id="join-status"></p>
+      <a class="link-btn" href="./">Lieber selbst spielen</a>
     </section>
 
     <!-- Spiel -->
     <section class="game" id="game" hidden>
       <div class="topbar">
         <button type="button" class="link-btn" id="menu-btn">‹ Menü</button>
+        <button type="button" class="link-btn" id="invite-btn">Einladen</button>
+        <span class="live-badge" id="live-badge" hidden>Live</span>
       </div>
+      <p class="watch-status" id="watch-status" hidden></p>
       <div class="timer" id="timer">2:00</div>
       <div class="board" id="board"></div>
       <section class="results" id="results" hidden>
@@ -84,6 +97,22 @@
       </div>
     </section>
   </main>
+
+  <!-- Einladungsfenster für den Gastgeber -->
+  <div class="invite" id="invite" hidden>
+    <div class="invite-card" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+      <h2 id="invite-title">Zuschauer einladen</h2>
+      <p class="hint" id="invite-status"></p>
+      <input class="invite-link" id="invite-link" readonly aria-label="Einladungslink">
+      <div class="invite-actions">
+        <button type="button" class="btn" id="invite-share">Teilen</button>
+        <button type="button" class="btn secondary" id="invite-copy">Kopieren</button>
+      </div>
+      <p class="invite-viewers" id="invite-viewers"></p>
+      <button type="button" class="link-btn" id="invite-close">Schließen</button>
+    </div>
+  </div>
+
   <div class="version" id="version"></div>
   <script src="version.js"></script>
   <script src="data/bigrams.js"></script>

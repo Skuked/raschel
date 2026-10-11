@@ -61,6 +61,7 @@ let dictionary = null;     // Promise<string[]>, wird erst bei Bedarf geladen
 const definitions = new Map(); // Wort -> Promise<{ title, meaning, … }>
 let definitionRequest = 0;
 let roundId = 0;
+let lastResults = null;    // { words, status } der letzten "Längste Wörter"-Liste, für Zuschauer
 
 const randomInt = (n) => Math.floor(Math.random() * n);
 
@@ -236,6 +237,7 @@ function startRound() {
   startBtn.disabled = true;
   showWordsBtn.hidden = true;
   resultsEl.hidden = true;
+  lastResults = null;
   hideDefinition();
   highlightPath(null);
 
@@ -254,6 +256,7 @@ function startRound() {
     tickId = setInterval(tick, 250);
     tick();
     startBtn.disabled = false;
+    broadcastState();
   }, 70);
 }
 
@@ -264,6 +267,7 @@ function endRound() {
   timerEl.className = 'timer over';
   showWordsBtn.hidden = false;
   playAlarm();
+  broadcastState();
 }
 
 // Vom Startbildschirm ins Spiel: Feld in der gewählten Größe aufbauen und gleich würfeln
@@ -275,6 +279,11 @@ function startGame() {
 }
 
 function openMenu() {
+  // Zuschauer verlassen die Sitzung und landen im eigenen Startbildschirm
+  if (watching) {
+    location.href = location.pathname;
+    return;
+  }
   if (tickId && !confirm('Laufende Runde abbrechen und zum Menü?')) return;
   clearInterval(tickId);
   clearInterval(shakeId);
@@ -287,6 +296,7 @@ function openMenu() {
   hideDefinition();
   gameEl.hidden = true;
   menuEl.hidden = false;
+  broadcastState();
 }
 
 // --- Einstellungen ---------------------------------------------------------------
@@ -317,11 +327,16 @@ function setBoardSize(n) {
   markSelected(sizeOptionsEl, n);
 }
 
-function setTheme(theme) {
+function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
+  themeColorMeta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+}
+
+function setTheme(theme) {
+  applyTheme(theme);
   saveSetting(THEME_KEY, theme);
   markSelected(themeOptionsEl, theme);
-  themeColorMeta.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  broadcastState();
 }
 
 function initSettings() {
@@ -531,6 +546,8 @@ async function showLongestWords() {
   resultsStatusEl.textContent = status;
   renderWordList(found);
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  lastResults = { words: found, status };
+  broadcastState();
 }
 
 // --- Definitionen (aus dem deutschen Wiktionary, braucht Internet) -------------
@@ -972,6 +989,315 @@ document.addEventListener('visibilitychange', () => {
   if (tickId) tick();
 });
 
+// --- Live-Sitzung: Zuschauer per Einladungslink -------------------------------
+// Gastgeber und Zuschauer verbinden sich direkt (WebRTC) über die Bibliothek PeerJS. Deren
+// kostenloser Vermittlungsdienst stellt nur den ersten Kontakt her; die Spieldaten gehen direkt
+// von Gerät zu Gerät. PeerJS wird erst geladen, wenn jemand einlädt oder zuschaut.
+
+const PEERJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js';
+const PEER_PREFIX = 'raschel-';
+const JOIN_TIMEOUT_MS = 20000;
+
+const inviteEl = document.getElementById('invite');
+const inviteStatusEl = document.getElementById('invite-status');
+const inviteLinkEl = document.getElementById('invite-link');
+const inviteShareBtn = document.getElementById('invite-share');
+const inviteCopyBtn = document.getElementById('invite-copy');
+const inviteViewersEl = document.getElementById('invite-viewers');
+const joinEl = document.getElementById('join');
+const joinBtn = document.getElementById('join-btn');
+const joinStatusEl = document.getElementById('join-status');
+const liveBadgeEl = document.getElementById('live-badge');
+const watchStatusEl = document.getElementById('watch-status');
+
+let hostPeer = null;       // Promise<Peer> des Gastgebers, bleibt für die ganze Sitzung bestehen
+let viewers = [];          // offene Verbindungen zu Zuschauern
+let watching = false;      // dieses Gerät schaut nur zu
+let shownResultsKey = '';  // welche Wortliste der Zuschauer gerade sieht (Feld + Wörter)
+
+function loadPeerJs() {
+  if (window.Peer) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = PEERJS_URL;
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('PeerJS konnte nicht geladen werden'));
+    document.head.append(script);
+  });
+}
+
+function randomId() {
+  const bytes = crypto.getRandomValues(new Uint8Array(9));
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join('');
+}
+
+// Alles, was ein Zuschauer zum Anzeigen braucht. Restzeit statt Endzeitpunkt, damit
+// unterschiedlich gestellte Uhren keine Rolle spielen.
+function sessionState() {
+  let phase = 'over';
+  if (gameEl.hidden) phase = 'menu';
+  else if (shakeId) phase = 'rolling';
+  else if (tickId) phase = 'running';
+  return {
+    type: 'state',
+    version: APP_VERSION,
+    phase,
+    size: boardSize,
+    theme: document.documentElement.dataset.theme,
+    letters,
+    remainingMs: tickId ? Math.max(0, endTime - Date.now()) : 0,
+    results: lastResults,
+  };
+}
+
+function broadcastState() {
+  if (!viewers.length) return;
+  const state = sessionState();
+  for (const conn of viewers) if (conn.open) conn.send(state);
+}
+
+// --- Gastgeber ---
+
+function updateViewerCount() {
+  const n = viewers.length;
+  inviteViewersEl.textContent = n === 1 ? '1 Zuschauer verbunden' : `${n} Zuschauer verbunden`;
+  document.getElementById('invite-btn').textContent = n ? `Einladen (${n})` : 'Einladen';
+}
+
+function ensureHostPeer() {
+  hostPeer ??= loadPeerJs().then(() => new Promise((resolve, reject) => {
+    const peer = new window.Peer(PEER_PREFIX + randomId());
+    peer.on('open', () => resolve(peer));
+    peer.on('error', (err) => reject(err));
+    peer.on('connection', (conn) => {
+      conn.on('open', () => {
+        viewers.push(conn);
+        conn.send(sessionState());
+        updateViewerCount();
+      });
+      conn.on('close', () => {
+        viewers = viewers.filter((c) => c !== conn);
+        updateViewerCount();
+      });
+    });
+    // Verbindung zum Vermittlungsdienst verloren: bestehende Zuschauer bleiben verbunden,
+    // für neue Zuschauer wieder anmelden
+    peer.on('disconnected', () => peer.reconnect());
+  })).catch((err) => {
+    hostPeer = null;
+    throw err;
+  });
+  return hostPeer;
+}
+
+function inviteLink(peerId) {
+  return `${location.origin}${location.pathname}?watch=${encodeURIComponent(peerId)}`;
+}
+
+async function openInvite() {
+  inviteEl.hidden = false;
+  inviteLinkEl.value = '';
+  inviteShareBtn.disabled = true;
+  inviteCopyBtn.disabled = true;
+  inviteShareBtn.hidden = !navigator.share;
+  inviteStatusEl.textContent = 'Einladungslink wird erstellt …';
+  updateViewerCount();
+  try {
+    const peer = await ensureHostPeer();
+    inviteLinkEl.value = inviteLink(peer.id);
+    inviteStatusEl.textContent = 'Wer diesen Link öffnet, sieht deine Runden live mit. Lass die App dafür geöffnet.';
+    inviteShareBtn.disabled = false;
+    inviteCopyBtn.disabled = false;
+  } catch {
+    inviteStatusEl.textContent = navigator.onLine
+      ? 'Der Vermittlungsdienst ist gerade nicht erreichbar. Bitte später noch einmal versuchen.'
+      : 'Zum Einladen wird eine Internetverbindung benötigt.';
+  }
+}
+
+async function shareInvite() {
+  try {
+    await navigator.share({ title: 'Raschel', text: 'Schau bei meiner Raschel-Runde zu:', url: inviteLinkEl.value });
+  } catch { /* Teilen abgebrochen */ }
+}
+
+async function copyInvite() {
+  try {
+    await navigator.clipboard.writeText(inviteLinkEl.value);
+    inviteCopyBtn.textContent = 'Kopiert ✓';
+  } catch {
+    // Ohne Zwischenablage-Zugriff: Link markieren, damit er von Hand kopiert werden kann
+    inviteLinkEl.select();
+    inviteCopyBtn.textContent = 'Markiert';
+  }
+  setTimeout(() => { inviteCopyBtn.textContent = 'Kopieren'; }, 2000);
+}
+
+// --- Zuschauer ---
+
+function showWatchStatus(text) {
+  watchStatusEl.textContent = text;
+  watchStatusEl.hidden = !text;
+}
+
+// Gastgeber und Zuschauer sollten dieselbe Version nutzen, sonst kann die Anzeige abweichen
+const versionNoticeEl = document.createElement('p');
+versionNoticeEl.className = 'watch-status version-notice';
+versionNoticeEl.hidden = true;
+watchStatusEl.after(versionNoticeEl);
+
+function checkHostVersion(hostVersion) {
+  const mismatch = hostVersion !== undefined && hostVersion !== APP_VERSION;
+  versionNoticeEl.hidden = !mismatch;
+  if (!mismatch || versionNoticeEl.childElementCount) return;
+  const reload = document.createElement('button');
+  reload.type = 'button';
+  reload.className = 'link-btn';
+  reload.textContent = 'Neu laden';
+  reload.addEventListener('click', () => location.reload());
+  versionNoticeEl.append(`Der Gastgeber nutzt Version ${hostVersion}, du Version ${APP_VERSION}. `, reload);
+}
+
+function setLive(online) {
+  liveBadgeEl.textContent = online ? 'Live' : 'Getrennt';
+  liveBadgeEl.classList.toggle('offline', !online);
+}
+
+// Vom Gastgeber empfangenen Stand anzeigen
+function applySessionState(state) {
+  if (state?.type !== 'state') return;
+  checkHostVersion(state.version);
+  joinEl.hidden = true;
+  menuEl.hidden = true;
+  gameEl.hidden = false;
+  applyTheme(state.theme);
+
+  if (state.phase === 'menu' || !state.letters?.length) {
+    clearInterval(tickId);
+    tickId = null;
+    timerEl.hidden = true;
+    resultsEl.hidden = true;
+    showWatchStatus('Warten auf die nächste Runde …');
+    return;
+  }
+  showWatchStatus('');
+
+  if (dieEls.length !== state.size * state.size) {
+    boardSize = state.size;
+    buildBoard(state.size);
+  }
+  const newBoard = state.letters.join() !== letters.join();
+  letters = state.letters;
+  renderBoard(letters);
+  if (newBoard) {
+    // Neue Runde: Liste, Markierung und Definition der vorigen Runde verwerfen
+    highlightPath(null);
+    hideDefinition();
+    wordListEl.replaceChildren();
+    shownResultsKey = '';
+  }
+
+  if (state.phase === 'running' || state.phase === 'rolling') {
+    clearInterval(tickId);
+    resultsEl.hidden = true;
+    timerEl.hidden = false;
+    timerEl.className = 'timer';
+    endTime = Date.now() + state.remainingMs;
+    tickId = setInterval(tick, 250);
+    tick();
+  } else if (state.phase === 'over') {
+    // Läuft die eigene Uhr noch (hängt knapp hinterher), jetzt beenden – samt Alarm, aber nur einmal
+    if (tickId) endRound();
+    else if (!state.results) {
+      timerEl.hidden = false;
+      timerEl.textContent = 'Zeit!';
+      timerEl.className = 'timer over';
+    }
+  }
+
+  if (state.results) {
+    timerEl.hidden = true;
+    resultsEl.hidden = false;
+    resultsStatusEl.textContent = state.results.status;
+    // Nur neu zeichnen, wenn sich die Liste geändert hat – sonst ginge die Auswahl des Zuschauers verloren
+    const key = `${letters.join('')}|${state.results.words.map((w) => w.word).join(',')}`;
+    if (key !== shownResultsKey) {
+      shownResultsKey = key;
+      highlightPath(null);
+      hideDefinition();
+      renderWordList(state.results.words);
+    }
+  }
+}
+
+async function joinSession(hostId) {
+  // Die Berührung auf "Zuschauen" erlaubt Ton und Bildschirm-anlassen
+  unlockAudio();
+  requestWakeLock();
+  started = true;
+  joinBtn.disabled = true;
+  joinStatusEl.textContent = 'Verbinde …';
+
+  const fail = (text) => {
+    joinStatusEl.textContent = text;
+    joinBtn.disabled = false;
+    joinBtn.textContent = 'Erneut versuchen';
+  };
+  try {
+    await loadPeerJs();
+  } catch {
+    fail(navigator.onLine ? 'Die Verbindung konnte nicht aufgebaut werden.' : 'Zum Zuschauen wird eine Internetverbindung benötigt.');
+    return;
+  }
+
+  const peer = new window.Peer();
+  let connected = false;
+  const timeout = setTimeout(() => {
+    if (connected) return;
+    peer.destroy();
+    fail('Keine Verbindung zum Gastgeber. Ist die App dort noch geöffnet?');
+  }, JOIN_TIMEOUT_MS);
+
+  peer.on('error', (err) => {
+    if (connected) return;
+    clearTimeout(timeout);
+    peer.destroy();
+    fail(err.type === 'peer-unavailable'
+      ? 'Diese Sitzung gibt es nicht mehr. Bitte um einen neuen Einladungslink.'
+      : 'Die Verbindung konnte nicht aufgebaut werden.');
+  });
+  peer.on('open', () => {
+    const conn = peer.connect(hostId, { reliable: true });
+    conn.on('open', () => {
+      connected = true;
+      clearTimeout(timeout);
+      joinStatusEl.textContent = '';
+      setLive(true);
+    });
+    conn.on('data', applySessionState);
+    conn.on('close', () => {
+      setLive(false);
+      clearInterval(tickId);
+      tickId = null;
+      showWatchStatus('Die Verbindung zum Gastgeber wurde getrennt.');
+    });
+  });
+}
+
+function initWatchMode() {
+  const hostId = new URLSearchParams(location.search).get('watch');
+  if (!hostId || !hostId.startsWith(PEER_PREFIX)) return false;
+  watching = true;
+  document.body.classList.add('watching');
+  menuBtn.textContent = '‹ Verlassen';
+  liveBadgeEl.hidden = false;
+  setLive(false);
+  menuEl.hidden = true;
+  joinEl.hidden = false;
+  joinBtn.addEventListener('click', () => joinSession(hostId));
+  return true;
+}
+
 // --- Start -------------------------------------------------------------------
 
 document.getElementById('version').textContent = `v${APP_VERSION}`;
@@ -979,7 +1305,14 @@ playBtn.addEventListener('click', startGame);
 menuBtn.addEventListener('click', openMenu);
 startBtn.addEventListener('click', startRound);
 showWordsBtn.addEventListener('click', showLongestWords);
+document.getElementById('invite-btn').addEventListener('click', openInvite);
+document.getElementById('menu-invite').addEventListener('click', openInvite);
+document.getElementById('invite-close').addEventListener('click', () => { inviteEl.hidden = true; });
+inviteEl.addEventListener('click', (e) => { if (e.target === inviteEl) inviteEl.hidden = true; });
+inviteShareBtn.addEventListener('click', shareInvite);
+inviteCopyBtn.addEventListener('click', copyInvite);
 initSettings();
+initWatchMode();
 
 if ('serviceWorker' in navigator) {
   // updateViaCache: 'none' – Änderungen an sw.js und version.js sofort erkennen
